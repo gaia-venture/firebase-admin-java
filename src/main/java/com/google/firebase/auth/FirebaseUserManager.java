@@ -73,6 +73,9 @@ final class FirebaseUserManager {
   private static final String ID_TOOLKIT_URL =
       "https://identitytoolkit.googleapis.com/%s/projects/%s";
 
+  private static final String EMULATOR_HOST_ENV_VAR_NAME =
+          "FIREBASE_AUTH_EMULATOR_HOST";
+
   private final String userMgtBaseUrl;
   private final String idpConfigMgtBaseUrl;
   private final JsonFactory jsonFactory;
@@ -85,8 +88,9 @@ final class FirebaseUserManager {
             + "set the project ID explicitly via FirebaseOptions. Alternatively you can also "
             + "set the project ID via the GOOGLE_CLOUD_PROJECT environment variable.");
     this.jsonFactory = checkNotNull(builder.jsonFactory, "JsonFactory must not be null");
-    final String idToolkitUrlV1 = String.format(ID_TOOLKIT_URL, "v1", projectId);
-    final String idToolkitUrlV2 = String.format(ID_TOOLKIT_URL, "v2", projectId);
+    String toolkitUrl = parseToolkitUrl();
+    final String idToolkitUrlV1 = String.format(toolkitUrl, "v1", projectId);
+    final String idToolkitUrlV2 = String.format(toolkitUrl, "v2", projectId);
     final String tenantId = builder.tenantId;
     if (tenantId == null) {
       this.userMgtBaseUrl = idToolkitUrlV1;
@@ -98,6 +102,27 @@ final class FirebaseUserManager {
     }
 
     this.httpClient = new AuthHttpClient(jsonFactory, builder.requestFactory);
+  }
+
+  String parseToolkitUrl() {
+    String toolkitUrl = ID_TOOLKIT_URL;
+
+    String emulatorHost = parseEmulatorHostEnvVar();
+    if (!Strings.isNullOrEmpty(emulatorHost)) {
+      toolkitUrl = toolkitUrl.replace("https://", "http://"+emulatorHost+"/");
+    }
+
+    return toolkitUrl;
+  }
+
+  String parseEmulatorHostEnvVar() {
+    String authEnvVarValue = System.getenv(EMULATOR_HOST_ENV_VAR_NAME).trim();
+
+    if (!Strings.isNullOrEmpty(authEnvVarValue)) {
+      return authEnvVarValue;
+    }
+
+    return null;
   }
 
   @VisibleForTesting
